@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keys, and keeping them secret</title>
+  <!-- Week 6 Day 2 demo (Tue Nov 24, after Career Readiness). Step through with Next / Back or the arrow keys.
+       Jump to a part with the buttons at the top, or #N in the URL.
+       Parts: 1 AI POST recap (#1) · 2 API key (#8) · 3 OAuth (#11) · 4 JWT (#15) · 5 Keeping it secret (#20).
+       The key shown is FAKE on purpose (AIzaSy...DEMO). Safe to screen-share. The JWT is built live from the
+       JSON below, so the decoded part really is what's inside the token; the signature is made up (labeled). -->
+  <style>
+    :root {
+      --bg: #fffcf9;
+      --ink: #1e293b;
+      --muted: #64748b;
+      --blue: #4e89bd;
+      --blue-light: #61afee;
+      --red: #e06c75;
+      --green: #3f8f5a;
+      --gold: #d79b2b;
+      --purple: #8e6bbf;
+      --line: #e2dcd3;
+      --hl: #fff1cc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: Inter, system-ui, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    h1 { margin: 20px 24px 8px; font-size: 1.6rem; text-align: center; }
+
+    .parts { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 24px; }
+    .parts button {
+      font: inherit; font-size: 0.9rem; font-weight: 600;
+      padding: 5px 14px; border-radius: 999px;
+      border: 2px solid var(--line); background: white; color: var(--muted); cursor: pointer;
+    }
+    .parts button.current { border-color: var(--blue); color: white; background: var(--blue); }
+
+    .stage { flex: 1; max-width: 1150px; width: 100%; margin: 0 auto; padding: 18px 24px; display: flex; align-items: center; }
+    .scene { display: none; width: 100%; }
+    .scene.active { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    .scene.wide.active { grid-template-columns: 1fr; }
+
+    .panel { border: 3px solid var(--ink); border-radius: 14px; background: white; overflow: hidden; }
+    .panel .bar { background: #f1ede7; padding: 6px 14px; font-weight: 700; font-size: 0.9rem; color: var(--muted); border-bottom: 2px solid var(--line); }
+    .panel .body { padding: 12px 14px; }
+    .code-panel { border-color: var(--blue); }
+
+    .mono { font-family: Consolas, monospace; }
+    .line { font-family: Consolas, monospace; font-size: 0.92rem; padding: 2px 14px; white-space: pre; border-left: 6px solid transparent; transition: background 0.3s, border-color 0.3s; }
+    .row { display: flex; gap: 8px; align-items: baseline; margin: 6px 0; padding: 4px 6px; border-radius: 8px; border-left: 6px solid transparent; transition: background 0.3s, border-color 0.3s; }
+    .row .k { color: var(--muted); font-weight: 700; min-width: 70px; font-size: 0.85rem; }
+    .row .v { font-family: Consolas, monospace; font-size: 0.9rem; overflow-wrap: anywhere; }
+    .pill { font-family: Consolas, monospace; font-weight: 700; color: white; background: var(--green); padding: 1px 10px; border-radius: 6px; }
+
+    .on { background: var(--hl) !important; border-left-color: var(--gold) !important; }
+    .secret { color: var(--purple); font-weight: 700; }
+    .danger { color: var(--red); font-weight: 700; }
+
+    [data-show] { opacity: 0; visibility: hidden; transition: opacity 0.35s; }
+    [data-show].vis { opacity: 1; visibility: visible; }
+    [data-show].swap:not(.vis) { display: none; }
+
+    /* Flow diagrams: boxes and arrows */
+    .flow { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+    .node { border: 3px solid var(--ink); border-radius: 12px; background: white; padding: 10px 14px; text-align: center; font-weight: 700; min-width: 130px; }
+    .node small { display: block; font-weight: 500; color: var(--muted); font-size: 0.8rem; }
+    .node.bad { border-color: var(--red); color: var(--red); }
+    .node.good { border-color: var(--green); }
+    .node.blue { border-color: var(--blue); }
+    .arrow { flex: 1; text-align: center; font-size: 0.85rem; color: var(--muted); }
+    .arrow .shaft { height: 3px; background: var(--ink); position: relative; margin: 4px 0; }
+    .arrow .shaft::after { content: ""; position: absolute; right: -2px; top: -6px; border: 7px solid transparent; border-left: 10px solid var(--ink); }
+    .arrow.red .shaft { background: var(--red); }
+    .arrow.red .shaft::after { border-left-color: var(--red); }
+    .arrow.green .shaft { background: var(--green); }
+    .arrow.green .shaft::after { border-left-color: var(--green); }
+
+    .card {
+      width: 300px; margin: 0 auto 14px; border-radius: 16px; padding: 16px 18px; color: white;
+      background: var(--blue); box-shadow: 0 6px 0 #3a6d99;
+    }
+    .card .t { font-size: 0.8rem; letter-spacing: 0.1em; opacity: 0.85; }
+    .card .n { font-family: Consolas, monospace; font-size: 1rem; margin-top: 18px; overflow-wrap: anywhere; }
+    .card .ph { float: right; width: 54px; height: 64px; border: 2px dashed rgba(255,255,255,0.7); border-radius: 8px; font-size: 0.65rem; text-align: center; padding-top: 20px; }
+
+    /* OAuth mock screens */
+    .mock-app { text-align: center; padding: 18px 14px; }
+    .mock-app h3 { margin: 0 0 4px; }
+    .signin { display: inline-block; margin-top: 12px; padding: 9px 18px; border: 2px solid #c9ced6; border-radius: 8px; font-weight: 700; background: white; }
+    .signin.on { box-shadow: 0 0 0 5px #fde9b8; border-color: var(--gold); }
+    .consent { padding: 16px 18px; }
+    .consent .who { font-size: 0.85rem; color: var(--muted); }
+    .consent ul { margin: 8px 0 14px; padding-left: 20px; }
+    .consent .btns { display: flex; justify-content: flex-end; gap: 10px; }
+    .consent .btns span { padding: 6px 16px; border-radius: 8px; font-weight: 700; border: 2px solid var(--line); }
+    .consent .btns .allow { background: var(--blue); color: white; border-color: var(--blue); }
+    .consent .btns .allow.on { box-shadow: 0 0 0 5px #fde9b8; }
+    .crossed { text-decoration: line-through; color: var(--red); }
+
+    /* JWT */
+    .token { font-family: Consolas, monospace; font-size: 1rem; overflow-wrap: anywhere; line-height: 1.6; padding: 12px 14px; }
+    .t-head { color: var(--red); }
+    .t-pay { color: var(--purple); }
+    .t-sig { color: var(--blue); }
+    .t-pay.changed { background: #fde2e4; border-radius: 4px; }
+    .legend { display: flex; gap: 14px; font-size: 0.85rem; padding: 0 14px 12px; flex-wrap: wrap; }
+    .decoded pre { margin: 0; font-family: Consolas, monospace; font-size: 0.95rem; white-space: pre-wrap; }
+    .stamp { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 8px; font-weight: 800; border: 3px solid; }
+    .stamp.ok { color: var(--green); border-color: var(--green); }
+    .stamp.no { color: var(--red); border-color: var(--red); }
+
+    /* Secrets */
+    .tree .f { font-family: Consolas, monospace; padding: 4px 10px; border-radius: 6px; border-left: 6px solid transparent; transition: background 0.3s; }
+    .tree .f.gray { color: #a8b1be; }
+    .tree .f .tag { font-family: Inter, sans-serif; font-size: 0.75rem; margin-left: 8px; }
+    .term { background: #1e293b; color: #e2e8f0; border-color: #1e293b; }
+    .term .bar { background: #334155; color: #cbd5e1; border-color: #334155; }
+    .term pre { margin: 0; font-family: Consolas, monospace; font-size: 0.9rem; white-space: pre-wrap; }
+    .stack { display: grid; gap: 14px; }
+    .stack > [data-show].swap { grid-column: 1; }
+
+    .caption { max-width: 980px; margin: 0 auto 8px; padding: 0 24px; min-height: 4.5em; font-size: 1.4rem; text-align: center; }
+    code { font-family: Consolas, monospace; background: #f1ede7; padding: 1px 6px; border-radius: 4px; }
+
+    .controls { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 0 24px 24px; }
+    .controls button { padding: 10px 24px; font: inherit; font-weight: 700; border: 2px solid var(--ink); border-radius: 999px; background: white; cursor: pointer; }
+    .controls #next { background: var(--ink); color: white; }
+    .controls button:disabled { opacity: 0.35; cursor: default; }
+    .count { color: var(--muted); }
+
+    @media (max-width: 860px) {
+      .scene.active { grid-template-columns: 1fr; }
+      .line { font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Keys, and keeping them secret</h1>
+  <div class="parts" id="parts"></div>
+
+  <div class="stage">
+
+    <!-- ============ 1. RECAP: the AI POST ============ -->
+    <div class="scene" id="scene-recap">
+      <div class="panel">
+        <div class="bar">Postman or Bruno · Ask Gemini (last week)</div>
+        <div class="body">
+          <div class="row" data-on="method"><span class="k">Method</span><span class="pill">POST</span></div>
+          <div class="row" data-on="url"><span class="k">URL</span><span class="v">https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent</span></div>
+          <div class="row" data-on="key"><span class="k">Headers</span><span class="v">x-goog-api-key: <span class="secret">{{gemini_key}}</span></span></div>
+          <div class="row" data-on="body"><span class="k">Body</span><span class="v">{ "contents": [{ "parts": [{ "text": "Say hello" }] }] }</span></div>
+          <div class="row" data-on="path" data-show="resp"><span class="k">Answer</span><span class="v">candidates → 0 → content → parts → 0 → <b>text</b></span></div>
+        </div>
+      </div>
+      <div class="panel code-panel">
+        <div class="bar">week-6/day-2/script.js (tonight)</div>
+        <div class="body" style="padding: 8px 0;">
+          <div class="line">const response = await fetch(url, {</div>
+          <div class="line" data-on="method">  method: "POST",</div>
+          <div class="line">  headers: {</div>
+          <div class="line">    "Content-Type": "application/json",</div>
+          <div class="line" data-on="key">    "x-goog-api-key": <span class="secret">GEMINI_KEY</span></div>
+          <div class="line">  },</div>
+          <div class="line" data-on="body">  body: JSON.stringify({</div>
+          <div class="line" data-on="body">    contents: [{ parts: [{ text: `${character}...` }] }]</div>
+          <div class="line" data-on="body">  })</div>
+          <div class="line">});</div>
+          <div class="line"> </div>
+          <div class="line" data-on="url">// url = the same Gemini address</div>
+          <div class="line" data-on="path" data-show="resp">data.candidates[0].content.parts[0].text</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 2. API KEY ============ -->
+    <div class="scene wide" id="scene-apikey">
+      <div>
+        <div class="card">
+          <div class="ph">no photo</div>
+          <div class="t">API KEY · MEMBER CARD</div>
+          <div class="n">AIzaSyDEMO-not-a-real-key-000</div>
+        </div>
+        <div class="flow" data-show="you">
+          <div class="node blue">Your page<small>sends the key</small></div>
+          <div class="arrow green"><div>x-goog-api-key: AIza...</div><div class="shaft"></div></div>
+          <div class="node">Gemini<small>checks the key</small></div>
+          <div class="arrow green" data-show="ok1"><div>&nbsp;</div><div class="shaft"></div><div>an answer ✓</div></div>
+          <div class="node good" data-show="ok1">Your account<small>pays for it</small></div>
+        </div>
+        <div class="flow" data-show="thief">
+          <div class="node bad">Someone else<small>copied your key</small></div>
+          <div class="arrow red"><div>x-goog-api-key: AIza...</div><div class="shaft"></div></div>
+          <div class="node">Gemini<small>same key, same answer</small></div>
+          <div class="arrow red"><div>&nbsp;</div><div class="shaft"></div><div>an answer ✓</div></div>
+          <div class="node bad">Your account<small>pays for it 😬</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 3. OAUTH ============ -->
+    <div class="scene" id="scene-oauth">
+      <div class="stack">
+        <div class="panel">
+          <div class="bar">portal-pages.example (some app)</div>
+          <div class="mock-app">
+            <h3>Portal Pages</h3>
+            <div style="color: var(--muted);">Save your favorite characters</div>
+            <span class="signin" data-on="btn">Sign in with Google</span>
+          </div>
+        </div>
+        <div class="panel" data-show="consent">
+          <div class="bar">accounts.google.com (Google's own page)</div>
+          <div class="consent">
+            <div class="who">Signed in as morty@example.com</div>
+            <strong>Portal Pages wants to:</strong>
+            <ul>
+              <li>See your name</li>
+              <li>See your email address</li>
+            </ul>
+            <div class="btns"><span>Cancel</span><span class="allow" data-on="allow">Allow</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="flow" data-show="consent">
+          <div class="node blue">You<small>password typed here</small></div>
+          <div class="arrow green"><div>log in</div><div class="shaft"></div></div>
+          <div class="node">Google<small>checks it</small></div>
+        </div>
+        <div class="flow" data-show="token">
+          <div class="node">Google</div>
+          <div class="arrow green"><div>a token: name + email only</div><div class="shaft"></div></div>
+          <div class="node good">Portal Pages<small>gets the token</small></div>
+        </div>
+        <div class="panel" data-show="valet" style="margin-top: 14px;">
+          <div class="body">
+            <div class="row"><span class="k">App got</span><span>a token that opens <strong>only what you allowed</strong></span></div>
+            <div class="row"><span class="k">App never got</span><span class="crossed">your Google password</span></div>
+            <div class="row"><span class="k">Like</span><span>a <strong>valet key</strong>: it drives the car, but can't open the trunk.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 4. JWT ============ -->
+    <div class="scene wide" id="scene-jwt">
+      <div class="stack">
+        <div class="flow" data-show="login">
+          <div class="node blue">You<small>log in once</small></div>
+          <div class="arrow green"><div>username + password</div><div class="shaft"></div></div>
+          <div class="node">Server<small>checks it</small></div>
+          <div class="arrow green"><div>here's your wristband</div><div class="shaft"></div></div>
+          <div class="node good">🎟️ JWT<small>show it every request</small></div>
+        </div>
+        <div class="panel" data-show="token">
+          <div class="bar">The JWT: just text, 3 parts, joined with dots</div>
+          <div class="token swap" data-show="orig"><span class="t-head" id="jwt-h"></span>.<span class="t-pay" id="jwt-p"></span>.<span class="t-sig" id="jwt-s"></span></div>
+          <div class="token swap" data-show="tamper"><span class="t-head" id="jwt-h2"></span>.<span class="t-pay changed" id="jwt-p2"></span>.<span class="t-sig" id="jwt-s2"></span></div>
+          <div class="legend"><span class="t-head">■ header</span><span class="t-pay">■ payload: what's inside</span><span class="t-sig">■ signature: the server's seal (made up here)</span></div>
+        </div>
+        <div class="panel decoded" data-show="decoded">
+          <div class="bar">Decoded payload (anyone can do this, no key needed)</div>
+          <div class="body">
+            <pre class="swap" data-show="orig" id="dec1"></pre>
+            <pre class="swap" data-show="tamper" id="dec2"></pre>
+            <span class="stamp ok swap" data-show="orig">✓ Signature matches: welcome in</span>
+            <span class="stamp no swap" data-show="tamper">✗ Signature doesn't match: 401, rejected</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 5. KEEPING IT SECRET ============ -->
+    <div class="scene" id="scene-secret">
+      <div class="stack">
+        <div class="panel">
+          <div class="bar">VS Code · week-6/day-2</div>
+          <div class="body tree">
+            <div class="f" data-on="gi">.gitignore</div>
+            <div class="f">auth-notes.md</div>
+            <div class="f">config.example.js <span class="tag" style="color: var(--muted);">no real key, safe to push</span></div>
+            <div class="f gray" data-on="cfg" data-show="cfgfile">config.js <span class="tag">gray = Git ignores it</span></div>
+            <div class="f">index.html</div>
+            <div class="f">script.js</div>
+          </div>
+        </div>
+        <div class="panel term" data-show="term">
+          <div class="bar">Terminal</div>
+          <div class="body"><pre>$ git status
+Untracked files:
+        week-6/day-2/auth-notes.md
+
+<span style="color: #86efac;">✓ no config.js in the list</span></pre></div>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="panel swap" data-show="problem">
+          <div class="bar">github.com · a public repo</div>
+          <div class="body">
+            <div class="line">const GEMINI_KEY = "<span class="danger">AIzaSyDEMO-not-a-real-key-000</span>";</div>
+            <p style="margin: 12px 0 0;">🤖 Bots search public repos for keys <strong>all day</strong>. A pushed key gets found in <strong>minutes</strong>.</p>
+          </div>
+        </div>
+        <div class="panel code-panel swap" data-show="gifile">
+          <div class="bar">.gitignore</div>
+          <div class="body" style="padding: 8px 0;">
+            <div class="line" style="color: var(--muted);"># Git ignores the files listed here</div>
+            <div class="line on">config.js</div>
+          </div>
+        </div>
+        <div class="panel code-panel swap" data-show="cfgcode">
+          <div class="bar">config.js (stays on your computer)</div>
+          <div class="body" style="padding: 8px 0;">
+            <div class="line">const GEMINI_KEY = "<span class="secret">AIzaSyDEMO-not-a-real-key-000</span>";</div>
+          </div>
+        </div>
+        <div class="panel swap" data-show="gh">
+          <div class="bar">github.com · your fork · week-6/day-2</div>
+          <div class="body tree">
+            <div class="f">.gitignore</div>
+            <div class="f">auth-notes.md</div>
+            <div class="f">config.example.js</div>
+            <div class="f">index.html</div>
+            <div class="f">script.js</div>
+            <div class="f" style="color: var(--green); font-family: Inter, sans-serif; font-weight: 700;">✓ no config.js. The key stayed home.</div>
+          </div>
+        </div>
+        <div class="panel swap" data-show="net">
+          <div class="bar">DevTools → Network → generateContent → Headers</div>
+          <div class="body">
+            <div style="font-weight: 700; color: var(--muted); font-size: 0.85rem;">Request Headers</div>
+            <div class="row"><span class="v">content-type: application/json</span></div>
+            <div class="row on"><span class="v">x-goog-api-key: <span class="danger">AIzaSyDEMO-not-a-real-key-000</span></span></div>
+            <p style="margin: 10px 0 0;">The browser has to send it, so <strong>anyone using the page</strong> can read it.</p>
+          </div>
+        </div>
+        <div class="panel swap" data-show="proxy">
+          <div class="bar">Week 7: a proxy</div>
+          <div class="body">
+            <div class="flow">
+              <div class="node blue" style="min-width: 90px;">Your page<small>no key</small></div>
+              <div class="arrow"><div>question</div><div class="shaft"></div></div>
+              <div class="node good" style="min-width: 90px;">Proxy<small>🔑 holds the key</small></div>
+              <div class="arrow"><div>+ key</div><div class="shaft"></div></div>
+              <div class="node" style="min-width: 90px;">Gemini</div>
+            </div>
+            <p style="margin: 6px 0 0;">Proxy: a small server that sends requests for you. Only the answer comes back.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="caption" id="caption"></p>
+
+  <div class="controls">
+    <button id="back" type="button">← Back</button>
+    <span class="count" id="count"></span>
+    <button id="next" type="button">Next →</button>
+  </div>
+
+  <script>
+    // ---------- Build a real-looking JWT from real JSON (signature is made up) ----------
+    function b64url(obj) {
+      return btoa(JSON.stringify(obj)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    }
+    const exp = Math.floor(Date.UTC(2026, 10, 25, 4, 59) / 1000); // Tue Nov 24, 11:59 PM Eastern
+    const header = { alg: "HS256", typ: "JWT" };
+    const payload = { name: "Morty Smith", role: "guest", exp: exp };
+    const tampered = { name: "Morty Smith", role: "admin", exp: exp };
+    const sig = "q8T2vLx0Wm4sJd9Rk1yNz7bUc3HfEo6aPi5gVt-MeQs";
+
+    document.getElementById("jwt-h").textContent = b64url(header);
+    document.getElementById("jwt-p").textContent = b64url(payload);
+    document.getElementById("jwt-s").textContent = sig;
+    document.getElementById("jwt-h2").textContent = b64url(header);
+    document.getElementById("jwt-p2").textContent = b64url(tampered);
+    document.getElementById("jwt-s2").textContent = sig;
+
+    function pretty(obj, note) {
+      return JSON.stringify(obj, null, 2).replace(`"exp": ${exp}`, `"exp": ${exp}   ← ${note}`);
+    }
+    document.getElementById("dec1").textContent = pretty(payload, "expires tonight, 11:59 PM");
+    document.getElementById("dec2").textContent = pretty(tampered, "expires tonight, 11:59 PM")
+      .replace('"admin",', '"admin",   ← Morty changed this!');
+
+    // ---------- Steps ----------
+    // scene: which picture. show: parts that appear. on: parts that light up.
+    const steps = [
+      // 1. Recap
+      { part: 0, scene: "recap", show: [], on: [],
+        text: "Last week: <strong>Ask Gemini</strong> in Postman or Bruno. Tonight the same request moves into <strong>JavaScript</strong>. Same parts, new home." },
+      { part: 0, scene: "recap", show: [], on: ["method"],
+        text: "<strong>Method</strong>: POST. We're <strong>sending</strong> something: a question." },
+      { part: 0, scene: "recap", show: [], on: ["url"],
+        text: "<strong>URL</strong>: where it goes. The same Gemini address in both." },
+      { part: 0, scene: "recap", show: [], on: ["key"],
+        text: "<strong>Headers</strong>: the key. In your API tool it was a secret variable, <code>{{gemini_key}}</code>. In JavaScript it's <code>GEMINI_KEY</code>, from a file called <code>config.js</code>." },
+      { part: 0, scene: "recap", show: [], on: ["body"],
+        text: "<strong>Body</strong>: the question, wrapped in <code>contents</code> → <code>parts</code> → <code>text</code>." },
+      { part: 0, scene: "recap", show: ["resp"], on: ["path"],
+        text: "The answer is buried deep. You found the path last week: <code>data.candidates[0].content.parts[0].text</code>" },
+      { part: 0, scene: "recap", show: ["resp"], on: ["key"],
+        text: "Everything here is fine to share <strong>except one thing: the key.</strong> Tonight: what a key is, and how to keep it secret." },
+
+      // 2. API key
+      { part: 1, scene: "apikey", show: [], on: [],
+        text: "<strong>API key</strong>: one secret string. Like a <strong>gym card</strong>: it says \"this is my account.\"" },
+      { part: 1, scene: "apikey", show: ["you", "ok1"], on: [],
+        text: "Every request carries it. Gemini checks the key, answers, and <strong>your account</strong> pays (on the free plan, it uses up your limit)." },
+      { part: 1, scene: "apikey", show: ["you", "ok1", "thief"], on: [],
+        text: "But the card has <strong>no photo</strong>. Anyone who copies your key gets in, and Gemini can't tell the difference. <strong>That's why we hide it.</strong>" },
+
+      // 3. OAuth
+      { part: 2, scene: "oauth", show: [], on: ["btn"],
+        text: "<strong>OAuth</strong>: one app uses another app <strong>for you</strong>. You've seen it: <strong>Sign in with Google.</strong>" },
+      { part: 2, scene: "oauth", show: ["consent"], on: [],
+        text: "Click it, and you go to <strong>Google's own page</strong>. You type your password there, <strong>not</strong> in the app." },
+      { part: 2, scene: "oauth", show: ["consent", "token"], on: ["allow"],
+        text: "Click <strong>Allow</strong>. Google gives the app a <strong>token</strong>: a pass for only what you allowed. Name and email. Nothing else." },
+      { part: 2, scene: "oauth", show: ["consent", "token", "valet"], on: [],
+        text: "The app <strong>never sees your password</strong>. Like a <strong>valet key</strong>: it drives the car, but can't open the trunk." },
+
+      // 4. JWT
+      { part: 3, scene: "jwt", show: ["login"], on: [],
+        text: "<strong>JWT</strong> (say \"jot\"): you log in <strong>once</strong>, and the server hands you a token. Like a <strong>concert wristband</strong>: show ID once, then the wristband all night." },
+      { part: 3, scene: "jwt", show: ["login", "token", "orig"], on: [],
+        text: "It's just text: <strong>3 parts</strong> joined with dots. Header, payload, signature." },
+      { part: 3, scene: "jwt", show: ["login", "token", "orig", "decoded"], on: [],
+        text: "Surprise: <strong>anyone can read the middle part</strong>. It's only scrambled, not locked. So never put a secret <strong>inside</strong> a JWT." },
+      { part: 3, scene: "jwt", show: ["login", "token", "tamper", "decoded"], on: [],
+        text: "Morty changes <code>\"guest\"</code> to <code>\"admin\"</code>. The <strong>signature</strong> no longer matches, and the server says no. You can read it, but you <strong>can't fake it</strong>." },
+      { part: 3, scene: "jwt", show: ["login", "token", "orig", "decoded"], on: [],
+        text: "And it <strong>expires</strong> (<code>exp</code>). After that, log in again. A wristband is good for one night." },
+
+      // 5. Keeping it secret
+      { part: 4, scene: "secret", show: ["problem"], on: [],
+        text: "Back to our API key. JavaScript needs it <strong>in a file</strong>. But your repo is <strong>public</strong>: anything you push, the whole internet can read." },
+      { part: 4, scene: "secret", show: ["gifile"], on: ["gi"],
+        text: "<code>.gitignore</code>: a list of files Git must <strong>never</strong> commit. Tonight's folder already has one. It lists <code>config.js</code>." },
+      { part: 4, scene: "secret", show: ["cfgfile", "cfgcode"], on: ["cfg"],
+        text: "Your key goes in <code>config.js</code>. In VS Code it's <strong>gray</strong>: Git is ignoring it." },
+      { part: 4, scene: "secret", show: ["cfgfile", "cfgcode", "term"], on: [],
+        text: "The important check: <code>git status</code>. <code>config.js</code> is <strong>not</strong> in the list. If it is: stop, don't commit, ask." },
+      { part: 4, scene: "secret", show: ["cfgfile", "term", "gh"], on: [],
+        text: "Commit and push. On GitHub: <strong>no config.js</strong>. Your key stayed home. 🎉" },
+      { part: 4, scene: "secret", show: ["cfgfile", "net"], on: [],
+        text: "But open DevTools → <strong>Network</strong> → <code>generateContent</code> → Headers. <strong>There's the key.</strong> The browser has to send it." },
+      { part: 4, scene: "secret", show: ["cfgfile", "proxy"], on: [],
+        text: "On your own computer, that's fine. On a public website, every visitor could copy it. <strong>Week 7:</strong> a proxy keeps the key on a server, so your page can go live." }
+    ];
+
+    const partNames = ["1 · AI POST recap", "2 · API key", "3 · OAuth", "4 · JWT", "5 · Keeping it secret"];
+
+    function el(id) { return document.getElementById(id); }
+
+    partNames.forEach(function (name, n) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = name;
+      b.addEventListener("click", function () {
+        step = steps.findIndex(function (s) { return s.part === n; });
+        show();
+      });
+      el("parts").appendChild(b);
+    });
+
+    let step = 0;
+
+    function show() {
+      const s = steps[step];
+
+      document.querySelectorAll(".scene").forEach(function (sc) {
+        sc.classList.toggle("active", sc.id === "scene-" + s.scene);
+      });
+      document.querySelectorAll("[data-show]").forEach(function (node) {
+        node.classList.toggle("vis", s.show.indexOf(node.dataset.show) !== -1);
+      });
+      document.querySelectorAll("[data-on]").forEach(function (node) {
+        node.classList.toggle("on", s.on.indexOf(node.dataset.on) !== -1);
+      });
+      el("parts").querySelectorAll("button").forEach(function (b, n) {
+        b.classList.toggle("current", n === s.part);
+      });
+
+      el("caption").innerHTML = s.text;
+      el("count").textContent = `${step + 1} / ${steps.length}`;
+      el("back").disabled = step === 0;
+      el("next").disabled = step === steps.length - 1;
+      history.replaceState(null, "", `#${step + 1}`);
+    }
+
+    function jump() {
+      const n = parseInt(location.hash.slice(1), 10);
+      if (n >= 1 && n <= steps.length && n - 1 !== step) { step = n - 1; show(); }
+    }
+
+    el("next").addEventListener("click", function () { if (step < steps.length - 1) { step++; show(); } });
+    el("back").addEventListener("click", function () { if (step > 0) { step--; show(); } });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") el("next").click();
+      if (e.key === "ArrowLeft") el("back").click();
+    });
+    window.addEventListener("hashchange", jump);
+
+    const start = parseInt(location.hash.slice(1), 10);
+    if (start >= 1 && start <= steps.length) step = start - 1;
+    show();
+  </script>
+</body>
+</html>
