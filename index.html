@@ -108,17 +108,12 @@
     .consent .btns .allow.on { box-shadow: 0 0 0 5px #fde9b8; }
     .crossed { text-decoration: line-through; color: var(--red); }
 
-    /* JWT */
-    .token { font-family: Consolas, monospace; font-size: 1rem; overflow-wrap: anywhere; line-height: 1.6; padding: 12px 14px; }
-    .t-head { color: var(--red); }
-    .t-pay { color: var(--purple); }
-    .t-sig { color: var(--blue); }
-    .t-pay.changed { background: #fde2e4; border-radius: 4px; }
-    .legend { display: flex; gap: 14px; font-size: 0.85rem; padding: 0 14px 12px; flex-wrap: wrap; }
-    .decoded pre { margin: 0; font-family: Consolas, monospace; font-size: 0.95rem; white-space: pre-wrap; }
-    .stamp { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 8px; font-weight: 800; border: 3px solid; }
-    .stamp.ok { color: var(--green); border-color: var(--green); }
-    .stamp.no { color: var(--red); border-color: var(--red); }
+    /* JWT ticket */
+    .ticket { max-width: 620px; margin: 0 auto; border: 3px dashed var(--gold); border-radius: 16px; background: #fffaf0; padding: 14px 20px; font-size: 1.1rem; }
+    .ticket .tt { font-weight: 800; margin-bottom: 8px; }
+    .ticket .trow { margin: 4px 0; }
+    .ticket .trow span { color: var(--muted); display: inline-block; min-width: 140px; }
+    .ticket .raw { margin-top: 10px; font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
 
     /* Secrets */
     .tree .f { font-family: Consolas, monospace; padding: 4px 10px; border-radius: 6px; border-left: 6px solid transparent; transition: background 0.3s; }
@@ -187,23 +182,22 @@
     <div class="scene wide" id="scene-apikey">
       <div>
         <div class="card">
-          <div class="ph">no photo</div>
-          <div class="t">API KEY · MEMBER CARD</div>
+          <div class="t">YOUR GEMINI API KEY</div>
           <div class="n">AIzaSyDEMO-not-a-real-key-000</div>
         </div>
         <div class="flow" data-show="you">
-          <div class="node blue">Your page<small>sends the key</small></div>
-          <div class="arrow green"><div>x-goog-api-key: AIza...</div><div class="shaft"></div></div>
+          <div class="node blue">Your page<small>sends your key</small></div>
+          <div class="arrow green"><div>question + your key</div><div class="shaft"></div></div>
           <div class="node">Gemini<small>checks the key</small></div>
-          <div class="arrow green" data-show="ok1"><div>&nbsp;</div><div class="shaft"></div><div>an answer ✓</div></div>
-          <div class="node good" data-show="ok1">Your account<small>pays for it</small></div>
+          <div class="arrow green" data-show="ok1"><div>✓ right key</div><div class="shaft"></div><div>sends an answer</div></div>
+          <div class="node good" data-show="ok1">Your page<small>gets the answer</small></div>
         </div>
         <div class="flow" data-show="thief">
-          <div class="node bad">Someone else<small>copied your key</small></div>
-          <div class="arrow red"><div>x-goog-api-key: AIza...</div><div class="shaft"></div></div>
-          <div class="node">Gemini<small>same key, same answer</small></div>
-          <div class="arrow red"><div>&nbsp;</div><div class="shaft"></div><div>an answer ✓</div></div>
-          <div class="node bad">Your account<small>pays for it 😬</small></div>
+          <div class="node bad">A stranger<small>copied your key</small></div>
+          <div class="arrow red"><div>question + YOUR key</div><div class="shaft"></div></div>
+          <div class="node">Gemini<small>thinks it's you</small></div>
+          <div class="arrow red"><div>✓ right key</div><div class="shaft"></div><div>sends an answer</div></div>
+          <div class="node bad">The stranger<small>uses up your free limit</small></div>
         </div>
       </div>
     </div>
@@ -259,24 +253,39 @@
         <div class="flow" data-show="login">
           <div class="node blue">You<small>log in once</small></div>
           <div class="arrow green"><div>username + password</div><div class="shaft"></div></div>
-          <div class="node">Server<small>checks it</small></div>
-          <div class="arrow green"><div>here's your wristband</div><div class="shaft"></div></div>
-          <div class="node good">🎟️ JWT<small>show it every request</small></div>
+          <div class="node">Server<small>checks your password</small></div>
+          <div class="arrow green"><div>gives you a ticket</div><div class="shaft"></div></div>
+          <div class="node good">🎟️ JWT<small>your ticket</small></div>
         </div>
-        <div class="panel" data-show="token">
-          <div class="bar">The JWT: just text, 3 parts, joined with dots</div>
-          <div class="token swap" data-show="orig"><span class="t-head" id="jwt-h"></span>.<span class="t-pay" id="jwt-p"></span>.<span class="t-sig" id="jwt-s"></span></div>
-          <div class="token swap" data-show="tamper"><span class="t-head" id="jwt-h2"></span>.<span class="t-pay changed" id="jwt-p2"></span>.<span class="t-sig" id="jwt-s2"></span></div>
-          <div class="legend"><span class="t-head">■ header</span><span class="t-pay">■ payload: what's inside</span><span class="t-sig">■ signature: the server's seal (made up here)</span></div>
+
+        <div class="ticket" data-show="ticket">
+          <div class="tt">🎟️ JWT: a ticket from the server</div>
+          <div class="trow"><span>Who:</span> <b class="swap" data-show="real">Morty Smith</b><b class="swap danger" data-show="fake">Morty Smith, ADMIN ← someone typed this in</b></div>
+          <div class="trow"><span>Good until:</span> <b>tonight, 11:59 PM</b></div>
+          <div class="trow"><span>Server's stamp:</span> <b class="swap" style="color: var(--green);" data-show="real">✓ matches</b><b class="swap danger" data-show="fake">✗ doesn't match anymore</b></div>
+          <div class="raw">What it really looks like: a long string, like <span class="mono">eyJhbGciOiJIUzI1NiJ9.eyJuYW1lIjoiTW9ydHkifQ.q8T2vLx0Wm4s...</span></div>
         </div>
-        <div class="panel decoded" data-show="decoded">
-          <div class="bar">Decoded payload (anyone can do this, no key needed)</div>
-          <div class="body">
-            <pre class="swap" data-show="orig" id="dec1"></pre>
-            <pre class="swap" data-show="tamper" id="dec2"></pre>
-            <span class="stamp ok swap" data-show="orig">✓ Signature matches: welcome in</span>
-            <span class="stamp no swap" data-show="tamper">✗ Signature doesn't match: 401, rejected</span>
-          </div>
+
+        <div class="flow swap" data-show="req">
+          <div class="node blue">You 🎟️<small>every click after that</small></div>
+          <div class="arrow green"><div>the ticket (no password)</div><div class="shaft"></div></div>
+          <div class="node">Server<small>checks the stamp</small></div>
+          <div class="arrow green"><div>✓ it's Morty, come in</div><div class="shaft"></div></div>
+          <div class="node good">Your stuff</div>
+        </div>
+        <div class="flow swap" data-show="fakeflow">
+          <div class="node bad">Changed ticket 🎟️<small>someone edited it</small></div>
+          <div class="arrow red"><div>the changed ticket</div><div class="shaft"></div></div>
+          <div class="node">Server<small>checks the stamp</small></div>
+          <div class="arrow red"><div>✗ stamp doesn't match</div><div class="shaft"></div></div>
+          <div class="node bad">No entry</div>
+        </div>
+        <div class="flow swap" data-show="expired">
+          <div class="node blue">You 🎟️<small>at midnight</small></div>
+          <div class="arrow red"><div>the old ticket</div><div class="shaft"></div></div>
+          <div class="node">Server<small>checks the time</small></div>
+          <div class="arrow red"><div>✗ ticket ran out</div><div class="shaft"></div></div>
+          <div class="node">Log in again</div>
         </div>
       </div>
     </div>
@@ -372,30 +381,6 @@ Untracked files:
   </div>
 
   <script>
-    // ---------- Build a real-looking JWT from real JSON (signature is made up) ----------
-    function b64url(obj) {
-      return btoa(JSON.stringify(obj)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
-    }
-    const exp = Math.floor(Date.UTC(2026, 10, 25, 4, 59) / 1000); // Tue Nov 24, 11:59 PM Eastern
-    const header = { alg: "HS256", typ: "JWT" };
-    const payload = { name: "Morty Smith", role: "guest", exp: exp };
-    const tampered = { name: "Morty Smith", role: "admin", exp: exp };
-    const sig = "q8T2vLx0Wm4sJd9Rk1yNz7bUc3HfEo6aPi5gVt-MeQs";
-
-    document.getElementById("jwt-h").textContent = b64url(header);
-    document.getElementById("jwt-p").textContent = b64url(payload);
-    document.getElementById("jwt-s").textContent = sig;
-    document.getElementById("jwt-h2").textContent = b64url(header);
-    document.getElementById("jwt-p2").textContent = b64url(tampered);
-    document.getElementById("jwt-s2").textContent = sig;
-
-    function pretty(obj, note) {
-      return JSON.stringify(obj, null, 2).replace(`"exp": ${exp}`, `"exp": ${exp}   ← ${note}`);
-    }
-    document.getElementById("dec1").textContent = pretty(payload, "expires tonight, 11:59 PM");
-    document.getElementById("dec2").textContent = pretty(tampered, "expires tonight, 11:59 PM")
-      .replace('"admin",', '"admin",   ← Morty changed this!');
-
     // ---------- Steps ----------
     // scene: which picture. show: parts that appear. on: parts that light up.
     const steps = [
@@ -417,33 +402,33 @@ Untracked files:
 
       // 2. API key
       { part: 1, scene: "apikey", show: [], on: [],
-        text: "<strong>API key</strong>: one secret string. Like a <strong>gym card</strong>: it says \"this is my account.\"" },
+        text: "An <strong>API key</strong> is a long secret password for your account, made for <strong>code</strong> to use, not people. Gemini gave you one last week." },
       { part: 1, scene: "apikey", show: ["you", "ok1"], on: [],
-        text: "Every request carries it. Gemini checks the key, answers, and <strong>your account</strong> pays (on the free plan, it uses up your limit)." },
+        text: "Your page sends the key with <strong>every request</strong>. Gemini checks it: right key, so it answers. That's how Gemini knows the request is <strong>from you</strong>." },
       { part: 1, scene: "apikey", show: ["you", "ok1", "thief"], on: [],
-        text: "But the card has <strong>no photo</strong>. Anyone who copies your key gets in, and Gemini can't tell the difference. <strong>That's why we hide it.</strong>" },
+        text: "The problem: <strong>whoever has the key can use it</strong>. If someone copies yours, Gemini thinks they're you, and they use up <strong>your</strong> free limit. So we keep the key secret." },
 
       // 3. OAuth
       { part: 2, scene: "oauth", show: [], on: ["btn"],
-        text: "<strong>OAuth</strong>: one app uses another app <strong>for you</strong>. You've seen it: <strong>Sign in with Google.</strong>" },
+        text: "<strong>OAuth</strong> is what's behind <strong>\"Sign in with Google\"</strong>. It lets an app know who you are <strong>without ever getting your password</strong>." },
       { part: 2, scene: "oauth", show: ["consent"], on: [],
-        text: "Click it, and you go to <strong>Google's own page</strong>. You type your password there, <strong>not</strong> in the app." },
+        text: "You click it, and you go to <strong>Google's own page</strong>. You type your password there, on Google, <strong>not</strong> in the app." },
       { part: 2, scene: "oauth", show: ["consent", "token"], on: ["allow"],
-        text: "Click <strong>Allow</strong>. Google gives the app a <strong>token</strong>: a pass for only what you allowed. Name and email. Nothing else." },
+        text: "Google asks: is it OK for this app to see your name and email? You click <strong>Allow</strong>. Google gives the app a pass for <strong>only those two things</strong>." },
       { part: 2, scene: "oauth", show: ["consent", "token", "valet"], on: [],
-        text: "The app <strong>never sees your password</strong>. Like a <strong>valet key</strong>: it drives the car, but can't open the trunk." },
+        text: "The app knows who you are, but it <strong>never saw your password</strong>. Like a <strong>valet key</strong>: it can drive your car, but it can't open the trunk." },
 
       // 4. JWT
       { part: 3, scene: "jwt", show: ["login"], on: [],
-        text: "<strong>JWT</strong> (say \"jot\"): you log in <strong>once</strong>, and the server hands you a token. Like a <strong>concert wristband</strong>: show ID once, then the wristband all night." },
-      { part: 3, scene: "jwt", show: ["login", "token", "orig"], on: [],
-        text: "It's just text: <strong>3 parts</strong> joined with dots. Header, payload, signature." },
-      { part: 3, scene: "jwt", show: ["login", "token", "orig", "decoded"], on: [],
-        text: "Surprise: <strong>anyone can read the middle part</strong>. It's only scrambled, not locked. So never put a secret <strong>inside</strong> a JWT." },
-      { part: 3, scene: "jwt", show: ["login", "token", "tamper", "decoded"], on: [],
-        text: "Morty changes <code>\"guest\"</code> to <code>\"admin\"</code>. The <strong>signature</strong> no longer matches, and the server says no. You can read it, but you <strong>can't fake it</strong>." },
-      { part: 3, scene: "jwt", show: ["login", "token", "orig", "decoded"], on: [],
-        text: "And it <strong>expires</strong> (<code>exp</code>). After that, log in again. A wristband is good for one night." },
+        text: "<strong>JWT</strong> (say \"jot\"): you don't want to type your password on every click. So you <strong>log in once</strong>, and the server gives you a <strong>ticket</strong>. That ticket is the JWT." },
+      { part: 3, scene: "jwt", show: ["login", "ticket", "real"], on: [],
+        text: "The ticket says <strong>who you are</strong> and <strong>when it runs out</strong>, and it has the <strong>server's stamp</strong> on it." },
+      { part: 3, scene: "jwt", show: ["ticket", "real", "req"], on: [],
+        text: "After that, your browser shows the <strong>ticket</strong> with every click, instead of your password. Like a <strong>concert wristband</strong>: show your ID once, then just the wristband all night." },
+      { part: 3, scene: "jwt", show: ["ticket", "fake", "fakeflow"], on: [],
+        text: "If anyone <strong>changes</strong> the ticket, the stamp doesn't match anymore, and the server says no. So <strong>nobody can make a fake one</strong>." },
+      { part: 3, scene: "jwt", show: ["ticket", "real", "expired"], on: [],
+        text: "And it <strong>runs out</strong>. After 11:59 PM, the server says no, and you log in again. A wristband is good for one night." },
 
       // 5. Keeping it secret
       { part: 4, scene: "secret", show: ["problem"], on: [],
